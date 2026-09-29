@@ -1,0 +1,79 @@
+@implements IDisposable
+@inject AuthStateService AuthState
+@inject IDemoLicenseService DemoLicense
+
+<main class="app-shell">
+    @if (_isCheckingLicense || _licenseStatus is null)
+    {
+        <section class="license-page">
+            <div class="license-loading">
+                <span class="spinner dark"></span>
+                <span>Đang kiểm tra phiên bản...</span>
+            </div>
+        </section>
+    }
+    else if (_licenseStatus.State == DemoLicenseState.Expired)
+    {
+        <DemoExpired Status="_licenseStatus" />
+    }
+    else if (_licenseStatus.State == DemoLicenseState.CannotVerify)
+    {
+        <DemoVerificationError Status="_licenseStatus"
+                               IsRetrying="_isCheckingLicense"
+                               OnRetry="RetryLicenseAsync" />
+    }
+    else if (AuthState.IsAuthenticated)
+    {
+        <ImportPage />
+    }
+    else
+    {
+        <LoginPage />
+    }
+</main>
+
+@code {
+    private readonly CancellationTokenSource _lifetimeCts = new();
+    private DemoLicenseStatus? _licenseStatus;
+    private bool _isCheckingLicense = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthState.StateChanged += OnAuthStateChanged;
+        DemoLicense.StatusChanged += OnLicenseStatusChanged;
+        await CheckLicenseAsync(false);
+    }
+
+    private void OnAuthStateChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void OnLicenseStatusChanged()
+    {
+        _licenseStatus = DemoLicense.CurrentStatus;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private Task RetryLicenseAsync() => CheckLicenseAsync(true);
+
+    private async Task CheckLicenseAsync(bool forceRefresh)
+    {
+        _isCheckingLicense = true;
+        try
+        {
+            _licenseStatus = await DemoLicense.CheckAsync(
+                forceRefresh, _lifetimeCts.Token);
+        }
+        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested) { }
+        finally
+        {
+            _isCheckingLicense = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        AuthState.StateChanged -= OnAuthStateChanged;
+        DemoLicense.StatusChanged -= OnLicenseStatusChanged;
+        _lifetimeCts.Cancel();
+        _lifetimeCts.Dispose();
+    }
+}

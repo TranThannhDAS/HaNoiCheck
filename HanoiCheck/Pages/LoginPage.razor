@@ -1,0 +1,233 @@
+@implements IDisposable
+@inject AuthService AuthService
+
+<section class="auth-page">
+    <div class="brand-panel">
+        <div class="brand-content">
+            <div class="brand-mark" aria-hidden="true">HC</div>
+            <p class="eyebrow">CỔNG NHÀ CUNG CẤP</p>
+            <h1>HanoiCheck</h1>
+            <p>Đăng nhập để tiếp tục quản lý dữ liệu trên hệ thống.</p>
+        </div>
+    </div>
+
+    <div class="form-panel">
+        <div class="login-card">
+            <p class="eyebrow accent">CHÀO MỪNG TRỞ LẠI</p>
+            <h2>Đăng nhập</h2>
+            <p class="subtitle">Vui lòng nhập thông tin tài khoản của bạn.</p>
+
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <div class="alert" role="alert">@_errorMessage</div>
+            }
+
+            <form @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+                <div class="field">
+                    <label for="username">Tên đăng nhập</label>
+                    <input id="username"
+                           type="text"
+                           autocomplete="username"
+                           placeholder="Nhập tên đăng nhập"
+                           @bind="_username"
+                           disabled="@_isLoggingIn" />
+                </div>
+
+                <div class="field">
+                    <label for="password">Mật khẩu</label>
+                    <input id="password"
+                           type="password"
+                           autocomplete="current-password"
+                           placeholder="Nhập mật khẩu"
+                           @bind="_password"
+                           disabled="@_isLoggingIn" />
+                </div>
+
+                <div class="field">
+                    <label for="captcha">Mã xác thực</label>
+                    <div class="captcha-row">
+                        <input id="captcha"
+                               type="text"
+                               autocomplete="off"
+                               spellcheck="false"
+                               placeholder="Nhập mã"
+                               @bind="_captchaCode"
+                               disabled="@(_isLoggingIn || _isLoadingCaptcha)" />
+                        <div class="captcha-box">
+                            @if (_isLoadingCaptcha)
+                            {
+                                <span class="spinner dark" aria-label="Đang tải captcha"></span>
+                            }
+                            else if (!string.IsNullOrWhiteSpace(_captchaImage))
+                            {
+                                <img src="@_captchaImage" alt="Mã xác thực" />
+                            }
+                            else
+                            {
+                                <span class="captcha-empty">Chưa có mã</span>
+                            }
+                        </div>
+                        <button class="refresh-button"
+                                type="button"
+                                title="Lấy mã xác thực mới"
+                                aria-label="Lấy mã xác thực mới"
+                                disabled="@(_isLoadingCaptcha || _isLoggingIn)"
+                                @onclick="LoadCaptchaAsync">
+                            ↻
+                        </button>
+                    </div>
+                </div>
+
+                <button class="primary-button"
+                        type="submit"
+                        disabled="@(_isLoggingIn || _isLoadingCaptcha || string.IsNullOrWhiteSpace(_captchaKey))">
+                    @if (_isLoggingIn)
+                    {
+                        <span class="spinner"></span>
+                        <span>Đang đăng nhập...</span>
+                    }
+                    else
+                    {
+                        <span>Đăng nhập</span>
+                    }
+                </button>
+            </form>
+        </div>
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource _lifetimeCts = new();
+    private string _username = "0108191247";
+    private string _password = "bAOAN2003@";
+    private string _captchaCode = string.Empty;
+    private string? _captchaKey;
+    private string? _captchaImage;
+    private string? _errorMessage;
+    private bool _isLoadingCaptcha;
+    private bool _isLoggingIn;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCaptchaAsync();
+    }
+
+    private async Task LoadCaptchaAsync()
+    {
+        if (_isLoadingCaptcha)
+        {
+            return;
+        }
+
+        _isLoadingCaptcha = true;
+        _errorMessage = null;
+        _captchaCode = string.Empty;
+        _captchaKey = null;
+        _captchaImage = null;
+
+        try
+        {
+            var result = await AuthService.GetCaptchaAsync(_lifetimeCts.Token);
+            if (result.IsSuccess && result.Value is not null)
+            {
+                _captchaKey = result.Value.Key;
+                _captchaImage = result.Value.Image;
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage;
+            }
+        }
+        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+        {
+            // Component is closing; no UI update is needed.
+        }
+        finally
+        {
+            _isLoadingCaptcha = false;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_isLoggingIn)
+        {
+            return;
+        }
+
+        _errorMessage = ValidateForm();
+        if (_errorMessage is not null)
+        {
+            return;
+        }
+
+        _isLoggingIn = true;
+        try
+        {
+            var request = new LoginRequest
+            {
+                Username = _username.Trim(),
+                Password = _password,
+                CaptchaKey = _captchaKey!,
+                CaptchaCode = _captchaCode.Trim()
+            };
+
+            var result = await AuthService.LoginAsync(request, _lifetimeCts.Token);
+            if (!result.IsSuccess)
+            {
+                _errorMessage = result.ErrorMessage;
+                if (IsCaptchaError(_errorMessage))
+                {
+                    await LoadCaptchaAsync();
+                    _errorMessage = result.ErrorMessage;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+        {
+            // Component is closing; no UI update is needed.
+        }
+        finally
+        {
+            _isLoggingIn = false;
+        }
+    }
+
+    private string? ValidateForm()
+    {
+        if (string.IsNullOrWhiteSpace(_username))
+        {
+            return "Vui lòng nhập tên đăng nhập.";
+        }
+
+        if (string.IsNullOrWhiteSpace(_password))
+        {
+            return "Vui lòng nhập mật khẩu.";
+        }
+
+        if (string.IsNullOrWhiteSpace(_captchaKey) || string.IsNullOrWhiteSpace(_captchaCode))
+        {
+            return "Vui lòng nhập mã xác thực.";
+        }
+
+        return null;
+    }
+
+    private static bool IsCaptchaError(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        return message.Contains("captcha", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("xác thực", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("mã xác nhận", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public void Dispose()
+    {
+        _lifetimeCts.Cancel();
+        _lifetimeCts.Dispose();
+    }
+}

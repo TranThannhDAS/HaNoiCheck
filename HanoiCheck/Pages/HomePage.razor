@@ -1,0 +1,17 @@
+@inject AuthStateService AuthState
+
+<section class="home-page">
+    <div class="success-card">
+        <div class="success-icon" aria-hidden="true">✓</div>
+        <p class="eyebrow accent">HANOICHECK</p>
+        <h2>Đăng nhập thành công</h2>
+        <p>Phiên đăng nhập đang được lưu an toàn trong bộ nhớ ứng dụng.</p>
+        <button class="secondary-button" type="button" @onclick="Logout">
+            Đăng xuất
+        </button>
+    </div>
+</section>
+
+@code {
+    private void Logout() => AuthState.Clear();
+}

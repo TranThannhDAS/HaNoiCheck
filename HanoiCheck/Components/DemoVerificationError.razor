@@ -1,0 +1,29 @@
+@inject IApplicationControlService ApplicationControl
+
+<section class="license-page">
+    <div class="license-card verification-error">
+        <div class="license-icon">↻</div>
+        <p class="eyebrow accent">KIỂM TRA PHIÊN BẢN</p>
+        <h1>Không thể xác minh thời hạn sử dụng</h1>
+        <p>@Status.ErrorMessage</p>
+        <div class="license-actions">
+            <button class="primary-button" type="button" disabled="@IsRetrying" @onclick="OnRetry">
+                @(IsRetrying ? "Đang thử lại..." : "Thử lại")
+            </button>
+            <button class="secondary-button" type="button" disabled="@IsRetrying" @onclick="ApplicationControl.CloseApplication">
+                Đóng ứng dụng
+            </button>
+        </div>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public DemoLicenseStatus Status { get; set; } = default!;
+
+    [Parameter]
+    public bool IsRetrying { get; set; }
+
+    [Parameter]
+    public EventCallback OnRetry { get; set; }
+}
