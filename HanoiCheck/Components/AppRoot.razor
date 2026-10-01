@@ -24,7 +24,14 @@
     }
     else if (AuthState.IsAuthenticated)
     {
-        <ImportPage />
+        <Router AppAssembly="@typeof(AppRoot).Assembly">
+            <Found Context="routeData">
+                <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+            </Found>
+            <NotFound>
+                <HomeRedirect />
+            </NotFound>
+        </Router>
     }
     else
     {

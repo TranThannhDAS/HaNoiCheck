@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Windows;
 using HanoiCheck.Services;
 using HanoiCheck.Services.Licensing;
+using HanoiCheck.Services.Menu;
 using Microsoft.AspNetCore.Components.WebView.Wpf;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -43,12 +44,22 @@ public partial class App : Application
                 new MediaTypeWithQualityHeaderValue("application/json"));
             client.Timeout = TimeSpan.FromMinutes(2);
         });
+        services.AddHttpClient<IMenuApiService, MenuApiService>(client =>
+        {
+            client.BaseAddress = new Uri("https://ncc-api.hanoicheck.com.vn/");
+            client.DefaultRequestHeaders.Accept.Add(
+                new MediaTypeWithQualityHeaderValue("application/json"));
+            client.Timeout = TimeSpan.FromMinutes(2);
+        });
         services.AddSingleton<IFilePickerService, FilePickerService>();
         services.AddSingleton<ExcelImportService>();
         services.AddSingleton<ImageResolverService>();
         services.AddSingleton<OptionResolverService>();
         services.AddSingleton<BatchPayloadBuilder>();
         services.AddSingleton<IBatchImportSaveService, BatchImportSaveService>();
+        services.AddSingleton<MenuExcelImportService>();
+        services.AddSingleton<MenuResolverService>();
+        services.AddSingleton<IMenuSaveService, MenuSaveService>();
         services.AddSingleton<MainWindow>();
 
         _serviceProvider = services.BuildServiceProvider();

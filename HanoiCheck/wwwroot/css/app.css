@@ -436,6 +436,91 @@ button:disabled, input:disabled {
 }
 
 /* Import workspace */
+.workspace-shell {
+    height: 100%;
+    display: grid;
+    grid-template-rows: 70px minmax(0, 1fr);
+    background: #f5f7fa;
+}
+
+.workspace-header {
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    border-bottom: 1px solid #e6eaf0;
+    background: #fff;
+}
+
+.workspace-main {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 214px minmax(0, 1fr);
+}
+
+.side-menu {
+    padding: 24px 14px;
+    border-right: 1px solid #e3e8ef;
+    background: #fff;
+}
+
+.side-menu-group {
+    margin: 0 10px 10px;
+    color: #98a2b3;
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: 1.2px;
+}
+
+.side-menu-link {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    min-height: 44px;
+    margin-bottom: 4px;
+    padding: 0 12px;
+    border-radius: 9px;
+    color: #526173;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    transition: color .15s ease, background .15s ease;
+}
+
+.side-menu-link svg {
+    width: 19px;
+    height: 19px;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.side-menu-link:hover {
+    color: #087f5b;
+    background: #f0faf6;
+}
+
+.side-menu-link.active {
+    color: #087f5b;
+    background: #e7f7f0;
+    box-shadow: inset 3px 0 #087f5b;
+}
+
+.workspace-content {
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.signed-in-label {
+    color: #7a8698;
+    font-size: 12px;
+}
+
 .import-page {
     height: 100%;
     overflow-y: auto;
@@ -658,6 +743,19 @@ button:disabled, input:disabled {
     grid-template-columns: repeat(4, 1fr);
     gap: 14px;
     margin-bottom: 20px;
+}
+
+.menu-summary-grid {
+    grid-template-columns: repeat(5, minmax(120px, 1fr));
+}
+
+.summary-card.saved.selected {
+    border-color: #087f5b;
+    box-shadow: 0 0 0 2px rgba(8,127,91,.1);
+}
+
+.summary-card.saved strong {
+    color: #087f5b;
 }
 
 .summary-card {
@@ -1206,6 +1304,55 @@ button:disabled, input:disabled {
     width: min(100%, 760px);
 }
 
+.menu-detail-modal {
+    width: min(100%, 720px);
+    max-height: min(760px, calc(100vh - 48px));
+    overflow-y: auto;
+}
+
+.meal-groups {
+    display: grid;
+    gap: 14px;
+    padding-top: 18px;
+}
+
+.meal-group {
+    overflow: hidden;
+    border: 1px solid #e0e5ec;
+    border-radius: 10px;
+}
+
+.meal-group h3 {
+    margin: 0;
+    padding: 10px 14px;
+    color: #087f5b;
+    background: #f0faf6;
+    font-size: 12px;
+    letter-spacing: .8px;
+    text-transform: uppercase;
+}
+
+.dish-detail-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 11px 14px;
+    border-top: 1px solid #edf0f4;
+}
+
+.dish-detail-row div {
+    display: grid;
+    gap: 3px;
+}
+
+.dish-detail-row strong { color: #344054; font-size: 13px; }
+.dish-detail-row small, .dish-detail-row > span { color: #8994a4; font-size: 11px; }
+
+.menu-preview-table {
+    min-width: 1380px;
+}
+
 .step-card {
     display: grid;
     grid-template-columns: 75px minmax(180px, 1fr) 120px minmax(150px, 1fr);
@@ -1239,11 +1386,21 @@ button:disabled, input:disabled {
 }
 
 @media (max-width: 1050px) {
+    .workspace-main { grid-template-columns: 184px minmax(0, 1fr); }
     .source-grid { grid-template-columns: 1fr 1fr; }
     .read-button { min-height: 52px; grid-column: 1 / -1; }
 }
 
 @media (max-width: 720px) {
+    .workspace-shell { grid-template-rows: 62px minmax(0, 1fr); }
+    .workspace-header { padding: 0 14px; }
+    .signed-in-label, .workspace-header .header-brand small { display: none; }
+    .workspace-main { grid-template-columns: 64px minmax(0, 1fr); }
+    .side-menu { padding: 18px 8px; }
+    .side-menu-group { display: none; }
+    .side-menu-link { justify-content: center; padding: 0; }
+    .side-menu-link span { display: none; }
+    .side-menu-link svg { width: 21px; height: 21px; }
     .app-header { padding: 0 18px; }
     .header-brand small, .text-button { display: none; }
     .import-content { width: calc(100% - 28px); padding-top: 22px; }

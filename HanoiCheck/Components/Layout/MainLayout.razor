@@ -1,0 +1,52 @@
+@inherits LayoutComponentBase
+@inject AuthStateService AuthState
+@inject IBatchApiService BatchApi
+@inject IMenuApiService MenuApi
+
+<div class="workspace-shell">
+    <header class="workspace-header">
+        <div class="header-brand">
+            <span class="header-logo">HC</span>
+            <div>
+                <strong>HanoiCheck</strong>
+                <small>Cổng nhập dữ liệu nhà cung cấp</small>
+            </div>
+        </div>
+        <div class="header-actions">
+            <span class="signed-in-label">Đã đăng nhập</span>
+            <button class="logout-button" type="button" @onclick="Logout">Đăng xuất</button>
+        </div>
+    </header>
+
+    <div class="workspace-main">
+        <aside class="side-menu">
+            <p class="side-menu-group">IMPORT DỮ LIỆU</p>
+            <NavLink class="side-menu-link" href="/import-batches" Match="NavLinkMatch.All">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5v-9Z" />
+                    <path d="m4.5 7.5 7.5 4 7.5-4M12 11.5V21" />
+                </svg>
+                <span>Lô nhập hàng</span>
+            </NavLink>
+            <NavLink class="side-menu-link" href="/import-menus" Match="NavLinkMatch.All">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M7 3v7M4.5 3v4.5A2.5 2.5 0 0 0 7 10v11M10 3v4.5A2.5 2.5 0 0 1 7.5 10M16 3v18M16 3c3 1 4 3.2 4 6.5S18.5 15 16 15" />
+                </svg>
+                <span>Thực đơn</span>
+            </NavLink>
+        </aside>
+
+        <main class="workspace-content">
+            @Body
+        </main>
+    </div>
+</div>
+
+@code {
+    private void Logout()
+    {
+        BatchApi.ClearCache();
+        MenuApi.ClearCache();
+        AuthState.Clear();
+    }
+}

@@ -1,24 +1,24 @@
-@page "/import-batches"
+@page "/import-menus"
 @layout MainLayout
 @implements IDisposable
-@inject IBatchApiService BatchApi
 @inject IFilePickerService FilePicker
-@inject ExcelImportService ExcelImport
-@inject OptionResolverService Resolver
-@inject IBatchImportSaveService SaveService
+@inject IMenuApiService MenuApi
+@inject MenuExcelImportService ExcelImport
+@inject MenuResolverService Resolver
+@inject IMenuSaveService SaveService
 @inject IDemoLicenseService DemoLicense
 
-<section class="import-page">
+<section class="import-page menu-import-page">
     <div class="import-content">
         <div class="page-title-row">
             <div>
-                <p class="eyebrow accent">IMPORT DATA</p>
-                <h1>Import lô nhập hàng</h1>
-                <p>Nhập và đồng bộ lô hàng từ file Excel.</p>
+                <p class="eyebrow accent">IMPORT DỮ LIỆU</p>
+                <h1>Import thực đơn</h1>
+                <p>Nhập và đồng bộ thực đơn từ file Excel theo từng khối thực đơn.</p>
             </div>
             @if (_isLoadingOptions)
             {
-                <span class="loading-note"><span class="spinner dark"></span> Đang tải options...</span>
+                <span class="loading-note"><span class="spinner dark"></span> Đang tải dữ liệu chọn...</span>
             }
             else
             {
@@ -37,7 +37,7 @@
             <div class="source-card">
                 <div class="source-number">1</div>
                 <div class="source-body">
-                    <strong>File Excel</strong>
+                    <strong>File Excel thực đơn</strong>
                     <span title="@_excelPath">@FileDisplay(_excelPath, "Chưa chọn file .xlsx")</span>
                 </div>
                 <button class="outline-button" type="button" disabled="@_isBusy" @onclick="PickExcel">
@@ -47,7 +47,7 @@
             <button class="read-button" type="button"
                     disabled="@(_isBusy || string.IsNullOrWhiteSpace(_excelPath) || _isLoadingOptions)"
                     @onclick="ReadDataAsync">
-                @if (_isBusy)
+                @if (_isBusy && !_isSaving)
                 {
                     <span class="spinner"></span>
                     <span>Đang xử lý...</span>
@@ -61,9 +61,9 @@
 
         @if (_result is not null)
         {
-            <div class="summary-grid">
+            <div class="summary-grid menu-summary-grid">
                 <button class="summary-card total @FilterClass(RowFilter.All)" @onclick="() => SetFilter(RowFilter.All)">
-                    <span>Tổng số dòng</span><strong>@_result.Total</strong>
+                    <span>Tổng thực đơn</span><strong>@_result.Total</strong>
                 </button>
                 <button class="summary-card valid @FilterClass(RowFilter.Valid)" @onclick="() => SetFilter(RowFilter.Valid)">
                     <span>Hợp lệ</span><strong>@_result.Valid</strong>
@@ -74,17 +74,20 @@
                 <button class="summary-card error @FilterClass(RowFilter.Error)" @onclick="() => SetFilter(RowFilter.Error)">
                     <span>Lỗi</span><strong>@_result.Errors</strong>
                 </button>
+                <button class="summary-card saved @FilterClass(RowFilter.Saved)" @onclick="() => SetFilter(RowFilter.Saved)">
+                    <span>Đã lưu</span><strong>@_result.Saved</strong>
+                </button>
             </div>
 
             <div class="save-readiness">
                 <div>
-                    <strong>@ReadyRows.Count dòng sẵn sàng lưu</strong>
-                    <span>Các dòng cần xác nhận hoặc lỗi sẽ không được gửi.</span>
+                    <strong>@ReadyRows.Count thực đơn sẵn sàng lưu</strong>
+                    <span>Thực đơn cần xác nhận hoặc có lỗi sẽ không được gửi.</span>
                 </div>
                 <button class="save-button" type="button"
                         disabled="@(_isBusy || ReadyRows.Count == 0)"
                         @onclick="OpenBulkConfirm">
-                    Lưu @ReadyRows.Count dòng hợp lệ
+                    Lưu @ReadyRows.Count thực đơn hợp lệ
                 </button>
             </div>
 
@@ -106,8 +109,8 @@
             <div class="preview-panel">
                 <div class="preview-toolbar">
                     <div>
-                        <h2>Preview dữ liệu</h2>
-                        <span>@FilteredRows.Count() dòng đang hiển thị</span>
+                        <h2>Preview theo thực đơn</h2>
+                        <span>@FilteredRows.Count() thực đơn đang hiển thị</span>
                     </div>
                     <div class="filter-tabs">
                         <button class="@FilterButtonClass(RowFilter.All)" @onclick="() => SetFilter(RowFilter.All)">Tất cả</button>
@@ -120,18 +123,18 @@
                 </div>
 
                 <div class="table-scroll">
-                    <table class="preview-table">
+                    <table class="preview-table menu-preview-table">
                         <thead>
                             <tr>
-                                <th>Dòng</th>
-                                <th>Thực phẩm</th>
-                                <th>Lô hàng</th>
-                                <th>Kho</th>
-                                <th>Nhà cung cấp</th>
-                                <th>Nhân viên</th>
-                                <th>Quy trình</th>
-                                <th>Ảnh</th>
+                                <th>Dòng bắt đầu</th>
+                                <th>Mã thực đơn</th>
+                                <th>Tên thực đơn</th>
                                 <th>Trạng thái</th>
+                                <th>Nhóm tuổi</th>
+                                <th>Thứ áp dụng</th>
+                                <th>Số trường</th>
+                                <th>Số món</th>
+                                <th>Resolve</th>
                                 <th>Lưu hệ thống</th>
                                 <th>Thao tác</th>
                             </tr>
@@ -140,22 +143,18 @@
                             @foreach (var row in FilteredRows)
                             {
                                 <tr>
-                                    <td class="row-number">@row.RowNumber<small title="@row.Source.SourceFileName">@row.Source.SourceFileName</small></td>
-                                    <td><strong>@Display(row.FoodName, row.Source.FoodName)</strong><small>@DisplayCode(row.FoodCode)</small></td>
-                                    <td><strong>@Display(row.Name)</strong><small>@DisplayCode(row.Code)</small></td>
-                                    <td>@Display(row.WarehouseDisplay, row.Source.WarehouseName)</td>
-                                    <td>@Display(row.SubSupplierDisplay, row.Source.SubSupplierName)</td>
-                                    <td>@Display(row.EmployeeDisplay, row.Source.EmployeeName)</td>
+                                    <td class="row-number">@row.RowNumber</td>
+                                    <td><strong>@Display(row.Code)</strong></td>
+                                    <td><strong>@Display(row.Name)</strong></td>
+                                    <td>@StatusValue(row)</td>
+                                    <td>@Display(row.StudentGroupName, row.Source.StudentGroupValue)</td>
+                                    <td>@Display(row.DayName, row.Source.DayValue)</td>
+                                    <td><strong>@row.SchoolIds.Count</strong><small>/ @row.Source.SchoolValues.Count khai báo</small></td>
+                                    <td><strong>@row.Items.Count</strong></td>
                                     <td>
-                                        <strong>@Display(row.ProcessName)</strong>
-                                        @if (row.BatchSteps.Count > 0)
-                                        {
-                                            <button class="link-button" @onclick="() => ShowSteps(row)">@row.BatchSteps.Count bước</button>
-                                        }
-                                    </td>
-                                    <td><strong>@row.Images.Count file</strong><small title="@row.Source.ImageSource">Từ đường dẫn Excel</small></td>
-                                    <td>
-                                        <span class="status-badge @StatusClass(row.Status)">@StatusText(row.Status)</span>
+                                        <span class="status-badge @ValidationStatusClass(row.ValidationStatus)">
+                                            @ValidationStatusText(row.ValidationStatus)
+                                        </span>
                                         @if (row.Errors.Count > 0)
                                         {
                                             <small class="row-message" title="@string.Join("; ", row.Errors)">@row.Errors[0]</small>
@@ -184,15 +183,12 @@
                                             {
                                                 <button class="resolve-button" disabled="@_isBusy" @onclick="() => ShowResolution(row)">Xác nhận</button>
                                             }
-                                            @if (row.BatchSteps.Count > 0)
-                                            {
-                                                <button class="icon-action" title="Xem các bước" @onclick="() => ShowSteps(row)">Chi tiết</button>
-                                            }
-                                            @if (row.Status == ImportRowStatus.Valid && row.SaveStatus == BatchSaveStatus.NotStarted)
+                                            <button class="icon-action" @onclick="() => ShowDetail(row)">Xem chi tiết</button>
+                                            @if (row.ValidationStatus == ImportRowStatus.Valid && row.SaveStatus == BatchSaveStatus.NotStarted)
                                             {
                                                 <button class="row-save-button" disabled="@_isBusy" @onclick="() => OpenSingleConfirm(row)">Lưu dòng này</button>
                                             }
-                                            else if (row.Status == ImportRowStatus.Valid && row.SaveStatus == BatchSaveStatus.Failed && CanRetry(row))
+                                            else if (row.ValidationStatus == ImportRowStatus.Valid && row.SaveStatus == BatchSaveStatus.Failed && CanRetry(row))
                                             {
                                                 <button class="row-retry-button" disabled="@_isBusy" @onclick="() => OpenSingleConfirm(row)">Thử lại</button>
                                             }
@@ -204,7 +200,7 @@
                     </table>
                     @if (!FilteredRows.Any())
                     {
-                        <div class="empty-state">Không có dòng nào trong bộ lọc này.</div>
+                        <div class="empty-state">Không có thực đơn nào trong bộ lọc này.</div>
                     }
                 </div>
             </div>
@@ -212,14 +208,15 @@
             @if (FailedRows.Count > 0 && !_isSaving)
             {
                 <div class="retry-bar">
-                    <span>@FailedRows.Count dòng lưu thất bại có thể thử lại.</span>
-                    <button type="button" @onclick="OpenRetryConfirm">Thử lại các dòng lỗi</button>
+                    <div><strong>@FailedRows.Count thực đơn lưu thất bại</strong><span>Có thể thử lại các lỗi chắc chắn chưa tạo dữ liệu.</span></div>
+                    <button class="outline-button" @onclick="OpenRetryConfirm">Thử lại dòng lỗi</button>
                 </div>
             }
+
             @if (UnknownRows.Count > 0)
             {
                 <div class="unknown-warning">
-                    @UnknownRows.Count dòng có trạng thái chưa xác định. Hãy kiểm tra trên hệ thống trước khi quyết định gửi lại để tránh tạo trùng.
+                    @UnknownRows.Count thực đơn chưa xác định kết quả. Hãy kiểm tra trên hệ thống trước khi gửi lại để tránh tạo trùng.
                 </div>
             }
         }
@@ -228,7 +225,7 @@
             <div class="welcome-panel">
                 <div class="welcome-icon">XLSX</div>
                 <h2>Chưa có dữ liệu preview</h2>
-                <p>File được kiểm tra và resolve hoàn toàn trước khi có thể chuyển sang bước lưu.</p>
+                <p>Mỗi khối bắt đầu bằng một Mã thực đơn và chứa nhiều dòng Bữa + Món ăn bên dưới.</p>
             </div>
         }
     </div>
@@ -241,7 +238,7 @@
             <div class="modal-header">
                 <div>
                     <p class="eyebrow accent">CẦN XÁC NHẬN</p>
-                    <h2>Chọn @_activeIssue.DisplayName.ToLowerInvariant()</h2>
+                    <h2>Chọn @_activeIssue.DisplayName</h2>
                     <p>Giá trị Excel: <strong>@_activeIssue.SourceValue</strong></p>
                 </div>
                 <button class="modal-close" @onclick="CloseModal">×</button>
@@ -251,7 +248,10 @@
                 {
                     <button class="candidate-card" disabled="@_isBusy" @onclick="() => SelectCandidateAsync(candidate)">
                         <strong>@Display(candidate.Name)</strong>
-                        <span>Mã: @Display(candidate.Code)</span>
+                        @if (!string.IsNullOrWhiteSpace(candidate.Code))
+                        {
+                            <span>Mã: @candidate.Code</span>
+                        }
                         @if (!string.IsNullOrWhiteSpace(candidate.Metadata))
                         {
                             <span>@candidate.Metadata</span>
@@ -259,32 +259,39 @@
                     </button>
                 }
             </div>
-            <p class="modal-hint">Lựa chọn này sẽ áp dụng cho mọi dòng có cùng giá trị trong phiên import hiện tại.</p>
+            <p class="modal-hint">Lựa chọn được nhớ trong phiên import hiện tại. Món ăn được nhớ riêng theo từng nhóm tuổi.</p>
         </div>
     </div>
 }
 
-@if (_stepsRow is not null)
+@if (_detailRow is not null)
 {
     <div class="modal-backdrop">
-        <div class="modal-card steps-modal">
+        <div class="modal-card menu-detail-modal">
             <div class="modal-header">
                 <div>
-                    <p class="eyebrow accent">CHI TIẾT QUY TRÌNH</p>
-                    <h2>@Display(_stepsRow.ProcessName)</h2>
-                    <p>@_stepsRow.BatchSteps.Count bước xử lý</p>
+                    <p class="eyebrow accent">CHI TIẾT THỰC ĐƠN</p>
+                    <h2>@Display(_detailRow.Name)</h2>
+                    <p>Mã: @Display(_detailRow.Code) · @_detailRow.Items.Count món</p>
                 </div>
                 <button class="modal-close" @onclick="CloseModal">×</button>
             </div>
-            <div class="steps-list">
-                @foreach (var step in _stepsRow.BatchSteps)
+            <div class="meal-groups">
+                @foreach (var group in DetailGroups)
                 {
-                    <div class="step-card">
-                        <span class="step-order">Bước @step.Order</span>
-                        <div><strong>@Display(step.Name)</strong><small>Mã: @Display(step.Code)</small></div>
-                        <div><span>SupplierStepId</span><strong>@step.SupplierStepId</strong></div>
-                        <div><span>Nhân viên</span><strong>@Display(_stepsRow.EmployeeDisplay)</strong></div>
-                    </div>
+                    <section class="meal-group">
+                        <h3>@group.Key</h3>
+                        @foreach (var item in group)
+                        {
+                            <div class="dish-detail-row">
+                                <div>
+                                    <strong>@Display(item.DishName, item.SourceDishValue)</strong>
+                                    <small>Dòng Excel @item.SourceRowNumber</small>
+                                </div>
+                                <span>@(string.IsNullOrWhiteSpace(item.DishCode) ? "Chưa có mã" : $"Mã: {item.DishCode}")</span>
+                            </div>
+                        }
+                    </section>
                 }
             </div>
         </div>
@@ -296,29 +303,19 @@
     <div class="modal-backdrop">
         <div class="modal-card confirm-modal">
             <div class="modal-header">
-                <div>
-                    <p class="eyebrow accent">XÁC NHẬN LƯU</p>
-                    <h2>@ConfirmTitle</h2>
-                </div>
-                <button class="modal-close" disabled="@_isSaving" @onclick="CloseModal">×</button>
+                <div><p class="eyebrow accent">XÁC NHẬN LƯU</p><h2>@ConfirmTitle</h2></div>
+                <button class="modal-close" @onclick="CloseModal">×</button>
             </div>
             <div class="confirm-message">
                 <p>@ConfirmMessage</p>
                 @if (_confirmRequest == SaveRequestKind.Bulk && _result is not null)
                 {
-                    <p>@_result.RequiresSelection dòng cần xác nhận và @_result.Errors dòng lỗi sẽ không được lưu.</p>
-                }
-                @if (_confirmRow is not null)
-                {
-                    <div class="confirm-row-detail">
-                        <strong>@Display(_confirmRow.Name)</strong>
-                        <span>Mã: @Display(_confirmRow.Code) · Dòng Excel @_confirmRow.RowNumber</span>
-                    </div>
+                    <p>@_result.Errors thực đơn lỗi và @_result.RequiresSelection thực đơn cần xác nhận sẽ không được lưu.</p>
                 }
             </div>
             <div class="modal-actions">
-                <button class="outline-button" type="button" @onclick="CloseModal">Hủy</button>
-                <button class="save-button" type="button" @onclick="ExecuteConfirmedSaveAsync">Tiếp tục</button>
+                <button class="outline-button" @onclick="CloseModal">Hủy</button>
+                <button class="save-button" @onclick="ExecuteConfirmedSaveAsync">Tiếp tục</button>
             </div>
         </div>
     </div>
@@ -331,7 +328,7 @@
             <div class="modal-header">
                 <div>
                     <p class="eyebrow accent">KẾT QUẢ</p>
-                    <h2>@(_saveSummary.WasCancelled ? "Đã dừng lưu dữ liệu" : "Hoàn tất lưu dữ liệu")</h2>
+                    <h2>@(_saveSummary.WasCancelled ? "Đã dừng lưu thực đơn" : "Hoàn tất lưu thực đơn")</h2>
                     <p>@_saveSummary.Message</p>
                 </div>
                 <button class="modal-close" @onclick="CloseSaveSummary">×</button>
@@ -342,22 +339,15 @@
                 <div class="failed"><span>Thất bại</span><strong>@_saveSummary.FailedCount</strong></div>
                 <div class="unknown"><span>Chưa xác định</span><strong>@_saveSummary.UnknownCount</strong></div>
             </div>
-            @if (_saveSummary.UnknownCount > 0)
-            {
-                <div class="unknown-warning">Không tự thử lại các dòng chưa xác định. Hãy kiểm tra dữ liệu trên hệ thống trước.</div>
-            }
             <div class="modal-actions">
-                @if (_saveSummary.FailedCount > 0)
+                @if (FailedRows.Count > 0)
                 {
-                    <button class="outline-button" type="button" @onclick="ShowSaveFailures">Xem dòng lỗi</button>
-                    @if (FailedRows.Count > 0)
-                    {
-                        <button class="save-button" type="button" @onclick="OpenRetryFromSummary">Thử lại dòng lỗi</button>
-                    }
+                    <button class="outline-button" @onclick="ShowSaveFailures">Xem dòng lỗi</button>
+                    <button class="save-button" @onclick="OpenRetryFromSummary">Thử lại dòng lỗi</button>
                 }
                 else
                 {
-                    <button class="save-button" type="button" @onclick="CloseSaveSummary">Đóng</button>
+                    <button class="save-button" @onclick="CloseSaveSummary">Đóng</button>
                 }
             </div>
         </div>
@@ -372,40 +362,34 @@
     private bool _isBusy;
     private bool _isSaving;
     private RowFilter _filter = RowFilter.All;
-    private IReadOnlyList<ImportBatchRow> _rawRows = [];
-    private ImportValidationResult? _result;
-    private OptionResolutionIssue? _activeIssue;
-    private ResolvedBatchRow? _stepsRow;
+    private IReadOnlyList<MenuImportBlock> _rawBlocks = [];
+    private MenuValidationResult? _result;
+    private MenuResolutionIssue? _activeIssue;
+    private ResolvedMenuRow? _detailRow;
     private SaveRequestKind? _confirmRequest;
-    private ResolvedBatchRow? _confirmRow;
-    private BatchSaveProgress? _saveProgress;
-    private BatchSaveSummary? _saveSummary;
+    private ResolvedMenuRow? _confirmRow;
+    private MenuSaveProgress? _saveProgress;
+    private MenuSaveSummary? _saveSummary;
     private CancellationTokenSource? _saveCts;
 
-    private List<ResolvedBatchRow> ReadyRows => _result?.Rows
-        .Where(row => row.Status == ImportRowStatus.Valid &&
-                      row.SaveStatus == BatchSaveStatus.NotStarted)
-        .ToList() ?? [];
-    private List<ResolvedBatchRow> FailedRows => _result?.Rows
-        .Where(row => row.Status == ImportRowStatus.Valid &&
-                      row.SaveStatus == BatchSaveStatus.Failed && CanRetry(row))
-        .ToList() ?? [];
-    private List<ResolvedBatchRow> UnknownRows => _result?.Rows
-        .Where(row => row.SaveStatus == BatchSaveStatus.Unknown)
-        .ToList() ?? [];
+    private List<ResolvedMenuRow> ReadyRows => _result?.Rows.Where(row =>
+        row.ValidationStatus == ImportRowStatus.Valid && row.SaveStatus == BatchSaveStatus.NotStarted).ToList() ?? [];
+    private List<ResolvedMenuRow> FailedRows => _result?.Rows.Where(row =>
+        row.ValidationStatus == ImportRowStatus.Valid && row.SaveStatus == BatchSaveStatus.Failed && CanRetry(row)).ToList() ?? [];
+    private List<ResolvedMenuRow> UnknownRows => _result?.Rows.Where(row => row.SaveStatus == BatchSaveStatus.Unknown).ToList() ?? [];
     private int SaveProgressPercentage => _saveProgress is null || _saveProgress.Total == 0
-        ? 0
-        : (int)Math.Round(_saveProgress.Current * 100d / _saveProgress.Total);
-
-    private IEnumerable<ResolvedBatchRow> FilteredRows => _result?.Rows.Where(row => _filter switch
+        ? 0 : (int)Math.Round(_saveProgress.Current * 100d / _saveProgress.Total);
+    private IEnumerable<ResolvedMenuRow> FilteredRows => _result?.Rows.Where(row => _filter switch
     {
-        RowFilter.Valid => row.Status == ImportRowStatus.Valid,
-        RowFilter.RequiresSelection => row.Status == ImportRowStatus.RequiresUserSelection,
-        RowFilter.Error => row.Status is ImportRowStatus.NotFound or ImportRowStatus.Error,
+        RowFilter.Valid => row.ValidationStatus == ImportRowStatus.Valid,
+        RowFilter.RequiresSelection => row.ValidationStatus == ImportRowStatus.RequiresUserSelection,
+        RowFilter.Error => row.ValidationStatus is ImportRowStatus.NotFound or ImportRowStatus.Error,
         RowFilter.Saved => row.SaveStatus == BatchSaveStatus.Success,
         RowFilter.SaveFailed => row.SaveStatus == BatchSaveStatus.Failed,
         _ => true
     }) ?? [];
+    private IEnumerable<IGrouping<string, ResolvedMenuItem>> DetailGroups => _detailRow?.Items
+        .GroupBy(item => Display(item.MealName, item.SourceMealValue)) ?? [];
 
     protected override async Task OnInitializedAsync() => await LoadOptionsAsync(false);
 
@@ -426,140 +410,106 @@
         _pageError = null;
         try
         {
-            if (!await EnsureLicenseAsync())
-            {
-                return;
-            }
-
-            var result = await BatchApi.GetFormOptionsAsync(forceRefresh, _lifetimeCts.Token);
-            if (!result.IsSuccess)
-            {
-                _pageError = result.ErrorMessage;
-            }
+            if (!await EnsureLicenseAsync()) return;
+            if (forceRefresh) MenuApi.ClearCache();
+            var groupsTask = MenuApi.GetStudentGroupsAsync(false, _lifetimeCts.Token);
+            var schoolsTask = MenuApi.GetSchoolOptionsAsync(false, _lifetimeCts.Token);
+            await Task.WhenAll(groupsTask, schoolsTask);
+            var groups = await groupsTask;
+            var schools = await schoolsTask;
+            if (!groups.IsSuccess) _pageError = groups.ErrorMessage;
+            else if (!schools.IsSuccess) _pageError = schools.ErrorMessage;
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested) { }
-        finally
-        {
-            _isLoadingOptions = false;
-        }
+        finally { _isLoadingOptions = false; }
     }
 
     private Task RefreshOptionsAsync() => LoadOptionsAsync(true);
 
     private async Task ReadDataAsync()
     {
-        if (string.IsNullOrWhiteSpace(_excelPath))
-        {
-            return;
-        }
-
+        if (string.IsNullOrWhiteSpace(_excelPath)) return;
         _isBusy = true;
         _pageError = null;
         _result = null;
         Resolver.ResetSessionMappings();
         try
         {
-            if (!await EnsureLicenseAsync())
+            if (!await EnsureLicenseAsync()) return;
+            var excel = await ExcelImport.ReadAsync(_excelPath, _lifetimeCts.Token);
+            if (!excel.IsSuccess)
             {
+                _pageError = excel.ErrorMessage;
                 return;
             }
 
-            var excelResult = await ExcelImport.ReadAsync(_excelPath, _lifetimeCts.Token);
-            if (!excelResult.IsSuccess)
-            {
-                _pageError = excelResult.ErrorMessage;
-                return;
-            }
-
-            _rawRows = excelResult.Rows;
-            _result = await Resolver.ResolveAsync(_rawRows, _lifetimeCts.Token);
+            _rawBlocks = excel.Rows;
+            var resolved = await Resolver.ResolveAsync(_rawBlocks, _lifetimeCts.Token);
+            if (resolved.IsSuccess) _result = resolved.Value;
+            else _pageError = resolved.ErrorMessage;
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested) { }
-        finally
-        {
-            _isBusy = false;
-        }
+        finally { _isBusy = false; }
     }
 
-    private void ShowResolution(ResolvedBatchRow row)
+    private void ShowResolution(ResolvedMenuRow row)
     {
-        _stepsRow = null;
+        _detailRow = null;
         _activeIssue = row.ResolutionIssues.FirstOrDefault();
     }
 
-    private async Task SelectCandidateAsync(ResolvedOption candidate)
+    private async Task SelectCandidateAsync(MenuOptionCandidate candidate)
     {
-        if (_activeIssue is null)
-        {
-            return;
-        }
-
-        if (!await EnsureLicenseAsync())
-        {
-            return;
-        }
-
-        Resolver.RememberSelection(_activeIssue.Kind, _activeIssue.SourceValue, candidate.Id);
+        if (_activeIssue is null || !await EnsureLicenseAsync()) return;
+        Resolver.RememberSelection(_activeIssue, candidate.Id);
         _activeIssue = null;
         _isBusy = true;
         try
         {
-            var previousResult = _result;
-            var updatedResult = await Resolver.ResolveAsync(_rawRows, _lifetimeCts.Token);
-            PreserveSaveStates(previousResult, updatedResult);
-            _result = updatedResult;
+            var previous = _result;
+            var resolved = await Resolver.ResolveAsync(_rawBlocks, _lifetimeCts.Token);
+            if (resolved.IsSuccess && resolved.Value is not null)
+            {
+                PreserveSaveStates(previous, resolved.Value);
+                _result = resolved.Value;
+            }
+            else _pageError = resolved.ErrorMessage;
         }
-        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested) { }
-        finally
-        {
-            _isBusy = false;
-        }
+        finally { _isBusy = false; }
     }
 
-    private void ShowSteps(ResolvedBatchRow row)
+    private void ShowDetail(ResolvedMenuRow row)
     {
         _activeIssue = null;
-        _stepsRow = row;
+        _detailRow = row;
     }
 
     private void CloseModal()
     {
         _activeIssue = null;
-        _stepsRow = null;
+        _detailRow = null;
         _confirmRequest = null;
         _confirmRow = null;
     }
 
     private void OpenBulkConfirm()
     {
-        if (ReadyRows.Count == 0)
-        {
-            return;
-        }
-
+        if (ReadyRows.Count == 0) return;
         CloseModal();
         _confirmRequest = SaveRequestKind.Bulk;
     }
 
     private void OpenRetryConfirm()
     {
-        if (FailedRows.Count == 0)
-        {
-            return;
-        }
-
+        if (FailedRows.Count == 0) return;
         CloseModal();
         _confirmRequest = SaveRequestKind.RetryFailed;
     }
 
-    private void OpenSingleConfirm(ResolvedBatchRow row)
+    private void OpenSingleConfirm(ResolvedMenuRow row)
     {
-        if (row.Status != ImportRowStatus.Valid ||
-            row.SaveStatus is BatchSaveStatus.Success or BatchSaveStatus.Unknown or BatchSaveStatus.Saving)
-        {
-            return;
-        }
-
+        if (row.ValidationStatus != ImportRowStatus.Valid ||
+            row.SaveStatus is BatchSaveStatus.Success or BatchSaveStatus.Unknown or BatchSaveStatus.Saving) return;
         CloseModal();
         _confirmRow = row;
         _confirmRequest = SaveRequestKind.Single;
@@ -567,35 +517,29 @@
 
     private string ConfirmTitle => _confirmRequest switch
     {
-        SaveRequestKind.Bulk => $"Lưu {ReadyRows.Count} lô nhập hàng?",
-        SaveRequestKind.RetryFailed => $"Thử lại {FailedRows.Count} dòng lỗi?",
-        SaveRequestKind.Single when _confirmRow?.SaveStatus == BatchSaveStatus.Failed => "Thử lưu lại dòng này?",
-        _ => "Lưu dòng này?"
+        SaveRequestKind.Bulk => $"Lưu {ReadyRows.Count} thực đơn?",
+        SaveRequestKind.RetryFailed => $"Thử lại {FailedRows.Count} thực đơn lỗi?",
+        _ => "Lưu thực đơn này?"
     };
 
     private string ConfirmMessage => _confirmRequest switch
     {
-        SaveRequestKind.Bulk => $"Bạn sắp lưu {ReadyRows.Count} lô nhập hàng lên hệ thống.",
-        SaveRequestKind.RetryFailed => "Chỉ các dòng có trạng thái lưu thất bại sẽ được gửi lại. Dòng đã lưu thành công và chưa xác định sẽ được bỏ qua.",
-        SaveRequestKind.Single when _confirmRow?.SaveStatus == BatchSaveStatus.Failed => "Dòng này đã từng lưu thất bại và sẽ được gửi lại một lần.",
-        _ => "Dòng hợp lệ này sẽ được gửi lên hệ thống."
+        SaveRequestKind.Bulk => $"Bạn sắp lưu {ReadyRows.Count} thực đơn lên hệ thống.",
+        SaveRequestKind.RetryFailed => "Chỉ các thực đơn lưu thất bại chắc chắn sẽ được gửi lại.",
+        _ => "Thực đơn hợp lệ này sẽ được gửi lên hệ thống."
     };
 
     private async Task ExecuteConfirmedSaveAsync()
     {
-        IReadOnlyCollection<ResolvedBatchRow> rows = _confirmRequest switch
+        IReadOnlyCollection<ResolvedMenuRow> rows = _confirmRequest switch
         {
             SaveRequestKind.Bulk => ReadyRows,
             SaveRequestKind.RetryFailed => FailedRows,
             SaveRequestKind.Single when _confirmRow is not null => [_confirmRow],
-            _ => Array.Empty<ResolvedBatchRow>()
+            _ => Array.Empty<ResolvedMenuRow>()
         };
-
         CloseModal();
-        if (rows.Count == 0)
-        {
-            return;
-        }
+        if (rows.Count == 0) return;
 
         _saveSummary = null;
         _saveProgress = null;
@@ -603,17 +547,14 @@
         _isBusy = true;
         _saveCts?.Dispose();
         _saveCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts.Token);
-
-        var progress = new Progress<BatchSaveProgress>(value =>
+        var progress = new Progress<MenuSaveProgress>(value =>
         {
             _saveProgress = value;
             _ = InvokeAsync(StateHasChanged);
         });
-
         try
         {
-            _saveSummary = await SaveService.SaveSequentiallyAsync(
-                rows, progress, _saveCts.Token);
+            _saveSummary = await SaveService.SaveSequentiallyAsync(rows, progress, _saveCts.Token);
         }
         finally
         {
@@ -625,80 +566,57 @@
     }
 
     private void CancelSave() => _saveCts?.Cancel();
-
-    private void ShowSaveFailures()
-    {
-        _filter = RowFilter.SaveFailed;
-        CloseSaveSummary();
-    }
-
-    private void OpenRetryFromSummary()
-    {
-        _saveSummary = null;
-        OpenRetryConfirm();
-    }
-
+    private void ShowSaveFailures() { _filter = RowFilter.SaveFailed; CloseSaveSummary(); }
+    private void OpenRetryFromSummary() { _saveSummary = null; OpenRetryConfirm(); }
     private void CloseSaveSummary() => _saveSummary = null;
-
-    private static void PreserveSaveStates(
-        ImportValidationResult? previous,
-        ImportValidationResult updated)
-    {
-        if (previous is null)
-        {
-            return;
-        }
-
-        var previousRows = previous.Rows.ToDictionary(
-            row => (row.Source.SourceFileName, row.RowNumber, row.Code));
-        foreach (var row in updated.Rows)
-        {
-            if (!previousRows.TryGetValue(
-                    (row.Source.SourceFileName, row.RowNumber, row.Code), out var oldRow))
-            {
-                continue;
-            }
-
-            row.SaveStatus = oldRow.SaveStatus;
-            row.LastSaveOutcome = oldRow.LastSaveOutcome;
-            row.SaveMessage = oldRow.SaveMessage;
-            row.SavedAt = oldRow.SavedAt;
-            row.BatchId = oldRow.BatchId;
-        }
-    }
-
     private void SetFilter(RowFilter filter) => _filter = filter;
+
     private async Task<bool> EnsureLicenseAsync()
     {
         var status = await DemoLicense.CheckAsync(false, _lifetimeCts.Token);
-        if (status.CanUseApplication)
-        {
-            return true;
-        }
-
+        if (status.CanUseApplication) return true;
         _pageError = status.ErrorMessage ?? "Phiên bản dùng thử đã hết hạn.";
         return false;
     }
+
+    private static void PreserveSaveStates(MenuValidationResult? previous, MenuValidationResult updated)
+    {
+        if (previous is null) return;
+        var oldRows = previous.Rows.ToDictionary(row => (row.Source.SourceFileName, row.RowNumber, row.Code));
+        foreach (var row in updated.Rows)
+        {
+            if (!oldRows.TryGetValue((row.Source.SourceFileName, row.RowNumber, row.Code), out var old)) continue;
+            row.SaveStatus = old.SaveStatus;
+            row.LastSaveOutcome = old.LastSaveOutcome;
+            row.SaveMessage = old.SaveMessage;
+            row.SavedAt = old.SavedAt;
+            row.MenuId = old.MenuId;
+        }
+    }
+
     private string FilterClass(RowFilter filter) => _filter == filter ? "selected" : string.Empty;
     private string FilterButtonClass(RowFilter filter) => _filter == filter ? "active" : string.Empty;
     private static string FileDisplay(string? path, string fallback) =>
-        string.IsNullOrWhiteSpace(path) ? fallback : Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar));
+        string.IsNullOrWhiteSpace(path) ? fallback : Path.GetFileName(path);
     private static string Display(params string?[] values) =>
         values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "—";
-    private static string DisplayCode(string? code) => string.IsNullOrWhiteSpace(code) ? "" : $"Mã: {code}";
-    private static string StatusClass(ImportRowStatus status) => status switch
+    private static string StatusValue(ResolvedMenuRow row) => row.Status switch
+    {
+        true => "Đang áp dụng",
+        false => "Ngừng áp dụng",
+        _ => Display(row.Source.StatusText)
+    };
+    private static string ValidationStatusClass(ImportRowStatus status) => status switch
     {
         ImportRowStatus.Valid => "status-valid",
         ImportRowStatus.RequiresUserSelection => "status-pending",
         _ => "status-error"
     };
-    private static string StatusText(ImportRowStatus status) => status switch
+    private static string ValidationStatusText(ImportRowStatus status) => status switch
     {
         ImportRowStatus.Valid => "Hợp lệ",
         ImportRowStatus.RequiresUserSelection => "Cần xác nhận",
-        ImportRowStatus.NotFound => "Không tìm thấy",
-        ImportRowStatus.Error => "Lỗi",
-        _ => "Đang xử lý"
+        _ => "Lỗi"
     };
     private static string SaveStatusClass(BatchSaveStatus status) => status switch
     {
@@ -716,11 +634,9 @@
         BatchSaveStatus.Saving => "Đang lưu",
         _ => "Chưa lưu"
     };
-    private static bool CanRetry(ResolvedBatchRow row) => row.LastSaveOutcome is
-        not SaveBatchOutcome.Unauthorized and
-        not SaveBatchOutcome.Forbidden and
-        not SaveBatchOutcome.LicenseBlocked and
-        not SaveBatchOutcome.Unknown and
+    private static bool CanRetry(ResolvedMenuRow row) => row.LastSaveOutcome is
+        not SaveBatchOutcome.Unauthorized and not SaveBatchOutcome.Forbidden and
+        not SaveBatchOutcome.LicenseBlocked and not SaveBatchOutcome.Unknown and
         not SaveBatchOutcome.Cancelled;
 
     public void Dispose()

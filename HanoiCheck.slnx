@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="HanoiCheck/HanoiCheck.csproj" />
+  <Project Path="HanoiCheck.SmokeTests/HanoiCheck.SmokeTests.csproj" />
 </Solution>

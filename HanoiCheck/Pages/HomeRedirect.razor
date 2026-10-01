@@ -1,0 +1,13 @@
+@page "/"
+@layout MainLayout
+@inject NavigationManager Navigation
+
+@code {
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Navigation.NavigateTo("/import-batches", replace: true);
+        }
+    }
+}
