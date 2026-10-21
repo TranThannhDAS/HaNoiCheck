@@ -122,8 +122,10 @@ public sealed class MenuExcelImportService
     {
         var blocks = new List<MenuImportBlock>();
         MenuImportBlock? current = null;
+
         foreach (var dataRow in dataRows.OrderBy(row => row.RowNumber))
         {
+            // 1. Có Code => bắt đầu một thực đơn mới
             if (!string.IsNullOrWhiteSpace(dataRow.Code))
             {
                 if (current is not null)
@@ -131,27 +133,50 @@ public sealed class MenuExcelImportService
                     blocks.Add(current);
                 }
 
-                current = NewBlock(sourceFileName, dataRow.RowNumber, dataRow.Code);
+                current = NewBlock(
+                    sourceFileName,
+                    dataRow.RowNumber,
+                    dataRow.Code);
+
                 current.Name = dataRow.Name;
                 current.StatusText = dataRow.Status;
                 current.StudentGroupValue = dataRow.StudentGroup;
                 current.DayValue = dataRow.Day;
-                current.SchoolValues.AddRange(SplitSchools(dataRow.Schools));
             }
 
-            if (string.IsNullOrWhiteSpace(dataRow.Meal) && string.IsNullOrWhiteSpace(dataRow.Dish))
+            // 2. Nếu đã thuộc một thực đơn,
+            // đọc TRƯỜNG ÁP DỤNG ở MỌI dòng
+            if (current is not null)
+            {
+                current.SchoolValues.AddRange(
+                    SplitSchools(dataRow.Schools));
+            }
+
+            // 3. Không có bữa/món => không cần tạo item
+            if (string.IsNullOrWhiteSpace(dataRow.Meal) &&
+                string.IsNullOrWhiteSpace(dataRow.Dish))
             {
                 continue;
             }
 
+            // 4. Có món nhưng chưa có parent menu
             if (current is null)
             {
-                current = NewBlock(sourceFileName, dataRow.RowNumber, null);
+                current = NewBlock(
+                    sourceFileName,
+                    dataRow.RowNumber,
+                    null);
+
                 current.ParseErrors.Add(
                     $"Dòng {dataRow.RowNumber} có món ăn nhưng chưa thuộc thực đơn nào.");
             }
 
-            AddItem(current, dataRow.Meal, dataRow.Dish, dataRow.RowNumber);
+            // 5. Add item
+            AddItem(
+                current,
+                dataRow.Meal,
+                dataRow.Dish,
+                dataRow.RowNumber);
         }
 
         if (current is not null)
