@@ -73,6 +73,12 @@ try
     await File.WriteAllBytesAsync(Path.Combine(proofDirectory, "b.png"), [2]);
     await File.WriteAllBytesAsync(Path.Combine(proofDirectory, "c.pdf"), [3]);
 
+    var batchImageDirectory = Path.Combine(testDirectory, "batch-images");
+    Directory.CreateDirectory(batchImageDirectory);
+    await File.WriteAllBytesAsync(Path.Combine(batchImageDirectory, "a.jpg"), [1]);
+    await File.WriteAllBytesAsync(Path.Combine(batchImageDirectory, "b.png"), [2]);
+    await File.WriteAllBytesAsync(Path.Combine(batchImageDirectory, "c.webp"), [3]);
+
     var full = await ResolveBatchAsync(NewBatchRow(
         facility: "CS01", imageSource: batchImage, proofSource: proofImage));
     Assert(full.Status == ImportRowStatus.Valid, "Dòng đầy đủ phải hợp lệ.");
@@ -120,6 +126,22 @@ try
                 threeProofPartNames.Contains($"batch_steps[0][images][{index}][file]") &&
                 threeProofPartNames.Contains($"batch_steps[0][images][{index}][name]")),
             "Multipart phải build đủ cả 3 File chứng minh trong thư mục.");
+    }
+
+    var sixFiles = await ResolveBatchAsync(NewBatchRow(
+        facility: null,
+        imageSource: batchImageDirectory,
+        proofSource: proofDirectory));
+    Assert(sixFiles.Images.Count == 3 && sixFiles.BatchSteps[0].Images.Count == 3,
+        "Mỗi cột ảnh phải được phép resolve độc lập tối đa 3 file.");
+    using (var sixFilesMultipart = new BatchPayloadBuilder().BuildMultipartContent(sixFiles))
+    {
+        var sixFilePartNames = sixFilesMultipart.Select(part =>
+            part.Headers.ContentDisposition?.Name?.Trim('"') ?? string.Empty).ToHashSet();
+        Assert(Enumerable.Range(0, 3).All(index =>
+                sixFilePartNames.Contains($"images[{index}][file]") &&
+                sixFilePartNames.Contains($"batch_steps[0][images][{index}][file]")),
+            "Payload phải chấp nhận đồng thời 3 ảnh lô và 3 File chứng minh.");
     }
 
     var invalidProof = await ResolveBatchAsync(NewBatchRow(

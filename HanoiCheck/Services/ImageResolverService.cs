@@ -5,7 +5,7 @@ namespace HanoiCheck.Services;
 
 public sealed class ImageResolverService
 {
-    private const int MaximumFilesPerBatch = 3;
+    private const int MaximumFilesPerField = 3;
     private const long MaximumFileSize = 5 * 1024 * 1024;
     private static readonly HashSet<string> SupportedExtensions =
         new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".webp", ".png", ".pdf" };
@@ -62,7 +62,7 @@ public sealed class ImageResolverService
                     $"Thư mục {sourceLabel} trong Excel không có file được hỗ trợ.");
             }
 
-            if (files.Count > MaximumFilesPerBatch)
+            if (files.Count > MaximumFilesPerField)
             {
                 return ServiceResult<IReadOnlyList<ResolvedImage>>.Failure(
                     $"Thư mục {sourceLabel} chứa {files.Count} file; mỗi trường chỉ được đính kèm tối đa 3 file.");
