@@ -34,7 +34,8 @@ public enum OptionKind
     Food,
     Warehouse,
     SubSupplier,
-    Employee
+    Employee,
+    Facility
 }
 
 public sealed class ImportBatchRow
@@ -46,6 +47,7 @@ public sealed class ImportBatchRow
     public string? Code { get; init; }
     public string? Name { get; init; }
     public DateTime? ImportDate { get; init; }
+    public DateTime? ProductionDate { get; init; }
     public DateTime? ExpireDate { get; init; }
     public string? WarehouseCode { get; init; }
     public string? WarehouseName { get; init; }
@@ -53,8 +55,13 @@ public sealed class ImportBatchRow
     public string? SubSupplierName { get; init; }
     public string? EmployeeCode { get; init; }
     public string? EmployeeName { get; init; }
+    public string? PurchaseAddress { get; init; }
+    public string? Description { get; init; }
+    public string? Facility { get; init; }
     public string? Note { get; init; }
+    public string? ExecutionAddress { get; init; }
     public string? ImageSource { get; init; }
+    public string? ProofFileSource { get; init; }
     public string? SourceDirectory { get; init; }
 }
 
@@ -88,9 +95,10 @@ public sealed class BatchStepModel
     public string? Code { get; init; }
     public int Order { get; init; }
     public List<int> SupplierEmployeeIds { get; init; } = [];
-    public int? SupplierFacilityId { get; init; }
-    public string? Address { get; init; }
-    public string? Note { get; init; }
+    public int? SupplierFacilityId { get; set; }
+    public string? FacilityDisplay { get; set; }
+    public string? Address { get; set; }
+    public string? Note { get; set; }
     public List<ResolvedImage> Images { get; init; } = [];
 }
 
