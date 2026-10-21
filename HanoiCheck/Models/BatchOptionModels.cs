@@ -52,7 +52,11 @@ public sealed class EmployeeOption : NamedOption
     public string? Warning { get; set; }
 }
 
-public sealed class FacilityOption : NamedOption;
+public sealed class FacilityOption : NamedOption
+{
+    [JsonPropertyName("address")]
+    public string? Address { get; set; }
+}
 
 public sealed class ProcessOption : NamedOption;
 

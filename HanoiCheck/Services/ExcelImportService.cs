@@ -16,14 +16,20 @@ public sealed class ExcelImportService
             ["batch_code"] = ["ma lo"],
             ["batch_name"] = ["ten lo"],
             ["import_date"] = ["ngay nhap"],
+            ["production_date"] = ["ngay san xuat"],
             ["expire_date"] = ["han dung"],
             ["warehouse_code"] = ["ma kho"],
             ["warehouse_name"] = ["ten kho", "kho", "kho phan bo"],
             ["sub_supplier_code"] = ["ma nha cung cap", "ma nha cung ung"],
             ["sub_supplier_name"] = ["ten nha cung cap", "nha cung cap", "nha cung ung"],
+            ["purchase_address"] = ["dia chi thu mua"],
+            ["description"] = ["mo ta"],
             ["employee_code"] = ["ma nhan vien"],
             ["employee_name"] = ["ten nhan vien", "nhan vien", "nhan vien thuc hien"],
+            ["facility"] = ["co so thuc hien"],
             ["note"] = ["ghi chu", "thong tin san xuat"],
+            ["execution_address"] = ["dia chi thuc hien"],
+            ["proof_file"] = ["file chung minh"],
             ["image_source"] = ["anh", "thu muc anh", "duong dan anh", "anh va giay to minh chung cua lo"]
         };
 
@@ -49,21 +55,16 @@ public sealed class ExcelImportService
             using var fileStream = File.Open(
                 filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             using var workbook = new XLWorkbook(fileStream);
-            var worksheet = workbook.Worksheets.FirstOrDefault();
+            var worksheet = workbook.Worksheets.FirstOrDefault(sheet =>
+                string.Equals(sheet.Name, "Sheet1", StringComparison.OrdinalIgnoreCase));
             var range = worksheet?.RangeUsed();
             if (worksheet is null || range is null)
             {
                 return ExcelImportResult.Failure("File Excel không có dữ liệu.");
             }
 
-            var headerMatch = FindHeaderRow(worksheet, range);
-            if (headerMatch is null)
-            {
-                return ExcelImportResult.Failure(
-                    "Không tìm thấy dòng tiêu đề hợp lệ trong 20 dòng đầu của file Excel.");
-            }
-
-            var (headerRow, headers) = headerMatch.Value;
+            var headerRow = worksheet.Row(2);
+            var headers = ReadHeaders(headerRow);
 
             var missingHeaders = RequiredHeaders.Where(header => !headers.ContainsKey(header)).ToList();
             if (missingHeaders.Count > 0)
@@ -73,7 +74,7 @@ public sealed class ExcelImportService
             }
 
             var rows = new List<ImportBatchRow>();
-            var firstDataRow = headerRow.RowNumber() + 1;
+            const int firstDataRow = 3;
             var lastRow = range.LastRow().RowNumber();
             for (var rowNumber = firstDataRow; rowNumber <= lastRow; rowNumber++)
             {
@@ -106,6 +107,7 @@ public sealed class ExcelImportService
                     Code = batchCode,
                     Name = batchName,
                     ImportDate = Date(row, headers, "import_date"),
+                    ProductionDate = Date(row, headers, "production_date"),
                     ExpireDate = Date(row, headers, "expire_date"),
                     WarehouseCode = Text(row, headers, "warehouse_code"),
                     WarehouseName = Text(row, headers, "warehouse_name"),
@@ -113,8 +115,13 @@ public sealed class ExcelImportService
                     SubSupplierName = Text(row, headers, "sub_supplier_name"),
                     EmployeeCode = Text(row, headers, "employee_code") ?? employeeValue,
                     EmployeeName = employeeValue,
+                    PurchaseAddress = Text(row, headers, "purchase_address"),
+                    Description = Text(row, headers, "description"),
+                    Facility = Text(row, headers, "facility"),
                     Note = Text(row, headers, "note"),
-                    ImageSource = imageSource
+                    ExecutionAddress = Text(row, headers, "execution_address"),
+                    ImageSource = imageSource,
+                    ProofFileSource = Text(row, headers, "proof_file")
                 });
             }
 
@@ -148,37 +155,24 @@ public sealed class ExcelImportService
         return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
-    private static (IXLRow Row, Dictionary<string, int> Headers)? FindHeaderRow(
-        IXLWorksheet worksheet,
-        IXLRange range)
+    private static Dictionary<string, int> ReadHeaders(IXLRow row)
     {
-        var lastCandidateRow = Math.Min(range.LastRow().RowNumber(),
-            range.FirstRow().RowNumber() + 19);
-        for (var rowNumber = range.FirstRow().RowNumber(); rowNumber <= lastCandidateRow; rowNumber++)
+        var headers = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var cell in row.CellsUsed())
         {
-            var row = worksheet.Row(rowNumber);
-            var headers = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            foreach (var cell in row.CellsUsed())
+            var normalized = NormalizeHeader(cell.GetString());
+            foreach (var alias in HeaderAliases)
             {
-                var normalized = NormalizeHeader(cell.GetString());
-                foreach (var alias in HeaderAliases)
+                if (!headers.ContainsKey(alias.Key) && alias.Value.Contains(
+                    normalized, StringComparer.OrdinalIgnoreCase))
                 {
-                    if (!headers.ContainsKey(alias.Key) && alias.Value.Contains(
-                        normalized, StringComparer.OrdinalIgnoreCase))
-                    {
-                        headers[alias.Key] = cell.Address.ColumnNumber;
-                        break;
-                    }
+                    headers[alias.Key] = cell.Address.ColumnNumber;
+                    break;
                 }
-            }
-
-            if (RequiredHeaders.All(headers.ContainsKey))
-            {
-                return (row, headers);
             }
         }
 
-        return null;
+        return headers;
     }
 
     private static DateTime? Date(IXLRow row, IReadOnlyDictionary<string, int> headers, string name)

@@ -12,7 +12,8 @@ public sealed class ImageResolverService
 
     public ServiceResult<IReadOnlyList<ResolvedImage>> ResolveFromExcel(
         string? source,
-        string? excelDirectory)
+        string? excelDirectory,
+        string sourceLabel = "ảnh")
     {
         if (string.IsNullOrWhiteSpace(source))
         {
@@ -45,7 +46,7 @@ public sealed class ImageResolverService
                 else
                 {
                     return ServiceResult<IReadOnlyList<ResolvedImage>>.Failure(
-                        $"Không tìm thấy đường dẫn ảnh '{sourcePart}'.");
+                        $"Không tìm thấy đường dẫn {sourceLabel} '{sourcePart}'.");
                 }
             }
 
@@ -58,13 +59,13 @@ public sealed class ImageResolverService
             if (files.Count == 0)
             {
                 return ServiceResult<IReadOnlyList<ResolvedImage>>.Failure(
-                    "Thư mục trong Excel không có file được hỗ trợ.");
+                    $"Thư mục {sourceLabel} trong Excel không có file được hỗ trợ.");
             }
 
             if (files.Count > MaximumFilesPerBatch)
             {
                 return ServiceResult<IReadOnlyList<ResolvedImage>>.Failure(
-                    $"Thư mục chứa {files.Count} file; mỗi lô chỉ được đính kèm tối đa 3 file.");
+                    $"Thư mục {sourceLabel} chứa {files.Count} file; mỗi trường chỉ được đính kèm tối đa 3 file.");
             }
 
             var oversized = files.FirstOrDefault(file => file.Length > MaximumFileSize);
@@ -87,7 +88,7 @@ public sealed class ImageResolverService
         catch (Exception)
         {
             return ServiceResult<IReadOnlyList<ResolvedImage>>.Failure(
-                "Không thể đọc thư mục ảnh đã chọn.");
+                $"Không thể đọc đường dẫn {sourceLabel} đã chọn.");
         }
     }
 }

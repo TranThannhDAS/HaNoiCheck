@@ -142,7 +142,11 @@
                                 <tr>
                                     <td class="row-number">@row.RowNumber<small title="@row.Source.SourceFileName">@row.Source.SourceFileName</small></td>
                                     <td><strong>@Display(row.FoodName, row.Source.FoodName)</strong><small>@DisplayCode(row.FoodCode)</small></td>
-                                    <td><strong>@Display(row.Name)</strong><small>@DisplayCode(row.Code)</small></td>
+                                    <td>
+                                        <strong>@Display(row.Name)</strong>
+                                        <small>@DisplayCode(row.Code)</small>
+                                        <small>NSX: @DisplayDate(row.ProductionDate)</small>
+                                    </td>
                                     <td>@Display(row.WarehouseDisplay, row.Source.WarehouseName)</td>
                                     <td>@Display(row.SubSupplierDisplay, row.Source.SubSupplierName)</td>
                                     <td>@Display(row.EmployeeDisplay, row.Source.EmployeeName)</td>
@@ -153,7 +157,10 @@
                                             <button class="link-button" @onclick="() => ShowSteps(row)">@row.BatchSteps.Count bước</button>
                                         }
                                     </td>
-                                    <td><strong>@row.Images.Count file</strong><small title="@row.Source.ImageSource">Từ đường dẫn Excel</small></td>
+                                    <td>
+                                        <strong>@row.Images.Count ảnh lô</strong>
+                                        <small>@row.BatchSteps.Sum(step => step.Images.Count) file chứng minh</small>
+                                    </td>
                                     <td>
                                         <span class="status-badge @StatusClass(row.Status)">@StatusText(row.Status)</span>
                                         @if (row.Errors.Count > 0)
@@ -184,10 +191,7 @@
                                             {
                                                 <button class="resolve-button" disabled="@_isBusy" @onclick="() => ShowResolution(row)">Xác nhận</button>
                                             }
-                                            @if (row.BatchSteps.Count > 0)
-                                            {
-                                                <button class="icon-action" title="Xem các bước" @onclick="() => ShowSteps(row)">Chi tiết</button>
-                                            }
+                                            <button class="icon-action" title="Xem dữ liệu lô và các bước" @onclick="() => ShowSteps(row)">Chi tiết</button>
                                             @if (row.Status == ImportRowStatus.Valid && row.SaveStatus == BatchSaveStatus.NotStarted)
                                             {
                                                 <button class="row-save-button" disabled="@_isBusy" @onclick="() => OpenSingleConfirm(row)">Lưu dòng này</button>
@@ -270,11 +274,20 @@
         <div class="modal-card steps-modal">
             <div class="modal-header">
                 <div>
-                    <p class="eyebrow accent">CHI TIẾT QUY TRÌNH</p>
-                    <h2>@Display(_stepsRow.ProcessName)</h2>
+                    <p class="eyebrow accent">CHI TIẾT LÔ VÀ QUY TRÌNH</p>
+                    <h2>@Display(_stepsRow.Name)</h2>
                     <p>@_stepsRow.BatchSteps.Count bước xử lý</p>
                 </div>
                 <button class="modal-close" @onclick="CloseModal">×</button>
+            </div>
+            <div class="batch-detail-grid">
+                <div><span>Ngày sản xuất</span><strong>@DisplayDate(_stepsRow.ProductionDate)</strong></div>
+                <div><span>Địa chỉ thu mua</span><strong>@Display(_stepsRow.PurchaseAddress)</strong></div>
+                <div><span>Mô tả</span><strong>@Display(_stepsRow.Description)</strong></div>
+                <div><span>Ảnh/giấy tờ của lô</span><strong>@FileNames(_stepsRow.Images)</strong></div>
+                <div><span>Cơ sở thực hiện</span><strong>@Display(_stepsRow.BatchSteps.FirstOrDefault()?.FacilityDisplay, _stepsRow.Source.Facility)</strong></div>
+                <div><span>Địa chỉ thực hiện</span><strong>@Display(_stepsRow.BatchSteps.FirstOrDefault()?.Address, _stepsRow.Source.ExecutionAddress)</strong></div>
+                <div class="detail-wide"><span>File chứng minh</span><strong>@FileNames(_stepsRow.BatchSteps.SelectMany(step => step.Images))</strong></div>
             </div>
             <div class="steps-list">
                 @foreach (var step in _stepsRow.BatchSteps)
@@ -283,8 +296,16 @@
                         <span class="step-order">Bước @step.Order</span>
                         <div><strong>@Display(step.Name)</strong><small>Mã: @Display(step.Code)</small></div>
                         <div><span>SupplierStepId</span><strong>@step.SupplierStepId</strong></div>
-                        <div><span>Nhân viên</span><strong>@Display(_stepsRow.EmployeeDisplay)</strong></div>
+                        <div><span>Nhân viên</span><strong>@(step.SupplierEmployeeIds.Count > 0 ? Display(_stepsRow.EmployeeDisplay) : "—")</strong></div>
+                        <div><span>Cơ sở</span><strong>@Display(step.FacilityDisplay)</strong></div>
+                        <div><span>Địa chỉ</span><strong>@Display(step.Address)</strong></div>
+                        <div><span>Thông tin sản xuất</span><strong>@Display(step.Note)</strong></div>
+                        <div><span>File chứng minh</span><strong>@FileNames(step.Images)</strong></div>
                     </div>
+                }
+                @if (_stepsRow.BatchSteps.Count == 0)
+                {
+                    <div class="empty-state">Không có bước quy trình.</div>
                 }
             </div>
         </div>
@@ -685,6 +706,12 @@
         string.IsNullOrWhiteSpace(path) ? fallback : Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar));
     private static string Display(params string?[] values) =>
         values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "—";
+    private static string DisplayDate(DateTime? value) => value?.ToString("dd/MM/yyyy") ?? "—";
+    private static string FileNames(IEnumerable<ResolvedImage> files)
+    {
+        var names = files.Select(file => Path.GetFileName(file.FilePath)).ToList();
+        return names.Count == 0 ? "—" : string.Join(", ", names);
+    }
     private static string DisplayCode(string? code) => string.IsNullOrWhiteSpace(code) ? "" : $"Mã: {code}";
     private static string StatusClass(ImportRowStatus status) => status switch
     {

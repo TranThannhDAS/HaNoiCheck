@@ -44,7 +44,13 @@ public sealed class OptionResolverService(
         FormOptionsData options,
         CancellationToken cancellationToken)
     {
-        var row = new ResolvedBatchRow { Source = source };
+        var row = new ResolvedBatchRow
+        {
+            Source = source,
+            ProductionDate = source.ProductionDate,
+            PurchaseAddress = source.PurchaseAddress,
+            Description = source.Description
+        };
         ValidateRequiredValues(row);
 
         var foodMatch = ResolveOption(
@@ -84,13 +90,15 @@ public sealed class OptionResolverService(
                 row.EmployeeDisplay = Display(option);
             });
 
+        var facility = ResolveFacility(row, source.Facility, options.Facilities);
+
         if (row.SupplierFoodId is int foodId)
         {
             await ResolveProcessAsync(row, foodId, cancellationToken);
         }
 
         ResolveImages(row);
-        BuildBatchSteps(row);
+        ApplyExcelDataToFirstStep(row, facility);
         SetStatus(row);
         return row;
     }
@@ -137,8 +145,7 @@ public sealed class OptionResolverService(
                 SupplierStepId = step.SupplierStepId,
                 Name = step.Name,
                 Code = step.Code,
-                Order = step.Order,
-                Note = row.Source.Note
+                Order = step.Order
             });
         }
     }
@@ -165,6 +172,15 @@ public sealed class OptionResolverService(
         {
             row.Errors.Add("Ngày nhập trống hoặc không đúng định dạng.");
         }
+
+        if (row.Source.ProductionDate is null)
+        {
+            row.Errors.Add("Ngày sản xuất trống hoặc không đúng định dạng.");
+        }
+        else if (row.Source.ProductionDate.Value.Date > DateTime.Today)
+        {
+            row.Errors.Add("Ngày sản xuất không được lớn hơn ngày hiện tại.");
+        }
     }
 
     private void ResolveImages(ResolvedBatchRow row)
@@ -185,16 +201,79 @@ public sealed class OptionResolverService(
         row.Images.AddRange(result.Value);
     }
 
-    private static void BuildBatchSteps(ResolvedBatchRow row)
+    private FacilityOption? ResolveFacility(
+        ResolvedBatchRow row,
+        string? sourceValue,
+        IReadOnlyCollection<FacilityOption> facilities)
     {
-        foreach (var step in row.BatchSteps)
+        if (string.IsNullOrWhiteSpace(sourceValue))
         {
-            if (row.SupplierEmployeeId is int employeeId)
-            {
-                step.SupplierEmployeeIds.Add(employeeId);
-            }
+            return null;
         }
 
+        var match = ResolveOption(
+            sourceValue, sourceValue, facilities,
+            OptionKind.Facility, "cơ sở thực hiện", FacilityMetadata);
+        if (match.Value is not null)
+        {
+            return match.Value;
+        }
+
+        if (match.Issue is not null)
+        {
+            row.ResolutionIssues.Add(match.Issue);
+        }
+        else
+        {
+            row.Errors.Add($"Không tìm thấy cơ sở thực hiện: {sourceValue.Trim()}.");
+        }
+
+        return null;
+    }
+
+    private void ApplyExcelDataToFirstStep(ResolvedBatchRow row, FacilityOption? facility)
+    {
+        if (row.BatchSteps.Count == 0)
+        {
+            if (!string.IsNullOrWhiteSpace(row.Source.ProofFileSource))
+            {
+                row.Errors.Add("Không có bước quy trình để gắn File chứng minh.");
+            }
+
+            return;
+        }
+
+        var firstStep = row.BatchSteps[0];
+        if (row.SupplierEmployeeId is int employeeId)
+        {
+            firstStep.SupplierEmployeeIds.Add(employeeId);
+        }
+
+        if (facility is not null)
+        {
+            firstStep.SupplierFacilityId = facility.Id;
+            firstStep.FacilityDisplay = Display(facility);
+        }
+
+        firstStep.Address = row.Source.ExecutionAddress;
+        firstStep.Note = row.Source.Note;
+
+        if (string.IsNullOrWhiteSpace(row.Source.ProofFileSource))
+        {
+            return;
+        }
+
+        var proofResult = imageResolver.ResolveFromExcel(
+            row.Source.ProofFileSource,
+            row.Source.SourceDirectory,
+            "File chứng minh");
+        if (!proofResult.IsSuccess || proofResult.Value is null)
+        {
+            row.Errors.Add(proofResult.ErrorMessage ?? "Không thể resolve File chứng minh.");
+            return;
+        }
+
+        firstStep.Images.AddRange(proofResult.Value);
     }
 
     private static void SetStatus(ResolvedBatchRow row)
@@ -356,6 +435,9 @@ public sealed class OptionResolverService(
 
     private static string? SubSupplierMetadata(SubSupplierOption option) =>
         option.ContractExpired ? "Hợp đồng đã hết hạn" : option.Warning;
+
+    private static string? FacilityMetadata(FacilityOption option) =>
+        string.IsNullOrWhiteSpace(option.Address) ? null : $"Địa chỉ: {option.Address}";
 
     private sealed record OptionMatch<T>(T? Value, OptionResolutionIssue? Issue, string? ErrorMessage)
         where T : NamedOption
