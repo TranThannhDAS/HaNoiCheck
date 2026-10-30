@@ -1,9 +1,11 @@
 using System.Net.Http.Headers;
 using System.Windows;
+using HanoiCheck.Configuration;
 using HanoiCheck.Services;
 using HanoiCheck.Services.Licensing;
 using HanoiCheck.Services.Menu;
 using Microsoft.AspNetCore.Components.WebView.Wpf;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HanoiCheck;
@@ -22,6 +24,13 @@ public partial class App : Application
 #if DEBUG
         services.AddBlazorWebViewDeveloperTools();
 #endif
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
+            .Build();
+        var accountAccess = configuration.GetSection(AccountAccessOptions.SectionName)
+            .Get<AccountAccessOptions>() ?? new AccountAccessOptions();
+        services.AddSingleton(accountAccess);
         services.AddSingleton<AuthStateService>();
         services.AddHttpClient<IInternetTimeService, InternetTimeService>(client =>
         {

@@ -1,5 +1,6 @@
 @implements IDisposable
 @inject AuthService AuthService
+@inject HanoiCheck.Configuration.AccountAccessOptions AccountAccess
 
 <section class="auth-page">
     <div class="brand-panel">
@@ -19,7 +20,13 @@
 
             @if (!string.IsNullOrWhiteSpace(_errorMessage))
             {
-                <div class="alert" role="alert">@_errorMessage</div>
+                <div class="alert" role="alert">
+                    @_errorMessage
+                    @if (_showContact)
+                    {
+                        <p>ZALO: @AccountAccess.ContactZalo</p>
+                    }
+                </div>
             }
 
             <form @onsubmit="SubmitAsync" @onsubmit:preventDefault>
@@ -106,6 +113,7 @@
     private string? _errorMessage;
     private bool _isLoadingCaptcha;
     private bool _isLoggingIn;
+    private bool _showContact;
 
     protected override async Task OnInitializedAsync()
     {
@@ -155,9 +163,17 @@
             return;
         }
 
+        _showContact = false;
         _errorMessage = ValidateForm();
         if (_errorMessage is not null)
         {
+            return;
+        }
+
+        if (!AccountAccess.IsAllowed(_username))
+        {
+            _errorMessage = "Tài khoản này chưa được cấp quyền sử dụng phần mềm. Vui lòng liên hệ để được hỗ trợ.";
+            _showContact = true;
             return;
         }
 

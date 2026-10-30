@@ -48,6 +48,7 @@ public sealed class ImportBatchRow
     public string? Name { get; init; }
     public DateTime? ImportDate { get; init; }
     public DateTime? ProductionDate { get; init; }
+    public string? ProductionDateRawValue { get; init; }
     public DateTime? ExpireDate { get; init; }
     public string? WarehouseCode { get; init; }
     public string? WarehouseName { get; init; }

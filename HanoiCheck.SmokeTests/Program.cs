@@ -2,21 +2,25 @@ using HanoiCheck.Models;
 using HanoiCheck.Services;
 using HanoiCheck.Services.Menu;
 
-var templatePath = args.FirstOrDefault() ??
-    @"C:\Users\datvc\Downloads\IMPORT_THUC_DON_TEMPLATE.xlsx";
+var domainOnly = args.Contains("--domain-only", StringComparer.OrdinalIgnoreCase);
+if (!domainOnly)
+{
+    var templatePath = args.FirstOrDefault() ??
+        @"C:\Users\datvc\Downloads\IMPORT_THUC_DON_TEMPLATE.xlsx";
 
-var parser = new MenuExcelImportService();
-var template = await parser.ReadAsync(templatePath);
-Assert(template.IsSuccess, template.ErrorMessage ?? "Không đọc được template.");
-Assert(template.Rows.Count == 2, "Template phải tạo đúng 2 MenuImportBlock.");
-Assert(template.Rows[0].RowNumber == 2 && template.Rows[0].Items.Count == 4,
-    "TD001 phải bắt đầu ở dòng 2 và có 4 món.");
-Assert(template.Rows[1].RowNumber == 6 && template.Rows[1].Items.Count == 2,
-    "TD002 phải bắt đầu ở dòng 6 và có 2 món.");
-Assert(template.Rows[0].Items.Count(item => item.MealValue == "Sáng") == 2,
-    "TD001 phải giữ nhiều món trong cùng bữa Sáng.");
-Assert(template.Rows[0].SchoolValues.SequenceEqual(["Trường A", "Trường B"]),
-    "Danh sách trường phải được tách đúng bằng dấu chấm phẩy.");
+    var parser = new MenuExcelImportService();
+    var template = await parser.ReadAsync(templatePath);
+    Assert(template.IsSuccess, template.ErrorMessage ?? "Không đọc được template.");
+    Assert(template.Rows.Count == 2, "Template phải tạo đúng 2 MenuImportBlock.");
+    Assert(template.Rows[0].RowNumber == 2 && template.Rows[0].Items.Count == 4,
+        "TD001 phải bắt đầu ở dòng 2 và có 4 món.");
+    Assert(template.Rows[1].RowNumber == 6 && template.Rows[1].Items.Count == 2,
+        "TD002 phải bắt đầu ở dòng 6 và có 2 món.");
+    Assert(template.Rows[0].Items.Count(item => item.MealValue == "Sáng") == 2,
+        "TD001 phải giữ nhiều món trong cùng bữa Sáng.");
+    Assert(template.Rows[0].SchoolValues.SequenceEqual(["Trường A", "Trường B"]),
+        "Danh sách trường phải được tách đúng bằng dấu chấm phẩy.");
+}
 
 var orphan = MenuExcelImportService.ParseRows([
     new MenuExcelDataRow(2, null, null, null, null, null, null, "Sáng", "Bánh mì")
@@ -45,18 +49,21 @@ var otherGroup = await resolver.ResolveAsync(otherGroupBlock);
 Assert(otherGroup.Value!.Rows.Single().ResolutionIssues.Any(item => item.Kind == MenuResolutionKind.Dish),
     "Mapping món của nhóm A không được áp dụng sang nhóm B.");
 
-var batchTemplatePath = args.Skip(1).FirstOrDefault() ??
-    @"C:\Users\datvc\Downloads\MẪU IMPORT LÔ NHẬP HÀNG - FINAL - 01.11.2026 (1).xlsx";
-var batchTemplate = await new ExcelImportService().ReadAsync(batchTemplatePath);
-Assert(batchTemplate.IsSuccess, batchTemplate.ErrorMessage ?? "Không đọc được template lô nhập hàng.");
-var templateRow = batchTemplate.Rows.First();
-Assert(templateRow.RowNumber == 3, "Dữ liệu lô phải bắt đầu từ dòng 3 của Sheet1.");
-Assert(templateRow.ProductionDate is not null &&
-       !string.IsNullOrWhiteSpace(templateRow.PurchaseAddress) &&
-       !string.IsNullOrWhiteSpace(templateRow.Description) &&
-       !string.IsNullOrWhiteSpace(templateRow.Facility) &&
-       !string.IsNullOrWhiteSpace(templateRow.ExecutionAddress),
-    "Parser phải đọc các cột mới trong template A:P.");
+if (!domainOnly)
+{
+    var batchTemplatePath = args.Skip(1).FirstOrDefault() ??
+        @"C:\Users\datvc\Downloads\MẪU IMPORT LÔ NHẬP HÀNG - FINAL - 01.11.2026 (1).xlsx";
+    var batchTemplate = await new ExcelImportService().ReadAsync(batchTemplatePath);
+    Assert(batchTemplate.IsSuccess, batchTemplate.ErrorMessage ?? "Không đọc được template lô nhập hàng.");
+    var templateRow = batchTemplate.Rows.First();
+    Assert(templateRow.RowNumber == 3, "Dữ liệu lô phải bắt đầu từ dòng 3 của Sheet1.");
+    Assert(templateRow.ProductionDate is not null &&
+           !string.IsNullOrWhiteSpace(templateRow.PurchaseAddress) &&
+           !string.IsNullOrWhiteSpace(templateRow.Description) &&
+           !string.IsNullOrWhiteSpace(templateRow.Facility) &&
+           !string.IsNullOrWhiteSpace(templateRow.ExecutionAddress),
+        "Parser phải đọc các cột mới trong template A:P.");
+}
 
 var testDirectory = Path.Combine(Path.GetTempPath(), $"hanoicheck-smoke-{Guid.NewGuid():N}");
 Directory.CreateDirectory(testDirectory);
@@ -80,7 +87,7 @@ try
     await File.WriteAllBytesAsync(Path.Combine(batchImageDirectory, "c.webp"), [3]);
 
     var full = await ResolveBatchAsync(NewBatchRow(
-        facility: "CS01", imageSource: batchImage, proofSource: proofImage));
+        facility: "KHO_TD", imageSource: batchImage, proofSource: proofImage));
     Assert(full.Status == ImportRowStatus.Valid, "Dòng đầy đủ phải hợp lệ.");
     Assert(full.BatchSteps.Count == 2, "Phải giữ nguyên toàn bộ bước quy trình từ API.");
     Assert(full.BatchSteps[0].SupplierFacilityId == 47 &&
@@ -108,10 +115,44 @@ try
     Assert(futureProduction.Errors.Contains("Ngày sản xuất không được lớn hơn ngày hiện tại."),
         "Ngày sản xuất trong tương lai phải bị chặn.");
 
+    var todayProduction = await ResolveBatchAsync(NewBatchRow(
+        facility: null, productionDate: DateTime.Today));
+    Assert(todayProduction.Status == ImportRowStatus.Valid,
+        "Ngày sản xuất bằng ngày hiện tại phải hợp lệ.");
+
+    var pastProduction = await ResolveBatchAsync(NewBatchRow(
+        facility: null, productionDate: DateTime.Today.AddDays(-1)));
+    Assert(pastProduction.Status == ImportRowStatus.Valid,
+        "Ngày sản xuất trước ngày hiện tại phải hợp lệ.");
+
+    var invalidProduction = await ResolveBatchAsync(NewBatchRow(
+        facility: null, productionDateRawValue: "không-phải-ngày", includeOptionalValues: false));
+    Assert(invalidProduction.Errors.Contains("Ngày sản xuất không đúng định dạng."),
+        "Ngày sản xuất có nhập nhưng sai định dạng phải bị chặn.");
+
     var blankOptional = await ResolveBatchAsync(NewBatchRow(
         facility: null, includeOptionalValues: false));
-    Assert(blankOptional.Status == ImportRowStatus.Valid,
+    Assert(blankOptional.Status == ImportRowStatus.Valid &&
+           blankOptional.ProductionDate is null &&
+           blankOptional.PurchaseAddress is null &&
+           blankOptional.Description is null &&
+           blankOptional.BatchSteps[0].SupplierFacilityId is null &&
+           blankOptional.BatchSteps[0].Address is null &&
+           blankOptional.BatchSteps[0].Images.Count == 0,
         "Các trường tùy chọn để trống vẫn phải hợp lệ.");
+    using (var blankOptionalMultipart = new BatchPayloadBuilder().BuildMultipartContent(blankOptional))
+    {
+        var blankOptionalPartNames = blankOptionalMultipart.Select(part =>
+            part.Headers.ContentDisposition?.Name?.Trim('"') ?? string.Empty).ToHashSet();
+        Assert(!blankOptionalPartNames.Contains("production_date") &&
+               !blankOptionalPartNames.Contains("purchase_address") &&
+               !blankOptionalPartNames.Contains("description") &&
+               !blankOptionalPartNames.Contains("batch_steps[0][supplier_facility_id]") &&
+               !blankOptionalPartNames.Contains("batch_steps[0][address]") &&
+               !blankOptionalPartNames.Any(name =>
+                   name.StartsWith("batch_steps[0][images]", StringComparison.Ordinal)),
+            "Multipart không được chứa các trường mới khi người dùng để trống.");
+    }
 
     var threeProofs = await ResolveBatchAsync(NewBatchRow(
         facility: null, proofSource: proofDirectory));
@@ -168,6 +209,18 @@ try
         NewBatchRow(facility: null, proofSource: proofImage), noProcessSteps: true);
     Assert(noStepProof.Errors.Contains("Không có bước quy trình để gắn File chứng minh."),
         "File chứng minh không có bước quy trình phải báo lỗi rõ ràng.");
+
+    var noStepOptionalBlank = await ResolveBatchAsync(
+        NewBatchRow(facility: null, includeOptionalValues: false), noProcessSteps: true);
+    Assert(!noStepOptionalBlank.Errors.Any(error =>
+               error.Contains("để gắn", StringComparison.OrdinalIgnoreCase)),
+        "Các trường bước tùy chọn để trống không được tạo lỗi gắn dữ liệu.");
+
+    var noStepFacilityAndAddress = await ResolveBatchAsync(
+        NewBatchRow(facility: "KHO_TD"), noProcessSteps: true);
+    Assert(noStepFacilityAndAddress.Errors.Contains("Không có bước quy trình để gắn Cơ sở thực hiện.") &&
+           noStepFacilityAndAddress.Errors.Contains("Không có bước quy trình để gắn Địa chỉ thực hiện."),
+        "Cơ sở và địa chỉ có dữ liệu nhưng không có bước quy trình phải báo lỗi rõ ràng.");
 }
 finally
 {
@@ -177,7 +230,9 @@ finally
     }
 }
 
-Console.WriteLine("PASS: menu import and batch template/parser/resolver/proof-file/multipart scenarios.");
+Console.WriteLine(domainOnly
+    ? "PASS: batch resolver/validation/proof-file/multipart scenarios."
+    : "PASS: menu import and batch template/parser/resolver/proof-file/multipart scenarios.");
 
 static async Task<ResolvedBatchRow> ResolveBatchAsync(
     ImportBatchRow row,
@@ -191,6 +246,7 @@ static async Task<ResolvedBatchRow> ResolveBatchAsync(
 static ImportBatchRow NewBatchRow(
     string? facility,
     DateTime? productionDate = null,
+    string? productionDateRawValue = null,
     string? imageSource = null,
     string? proofSource = null,
     bool includeOptionalValues = true) => new()
@@ -203,7 +259,8 @@ static ImportBatchRow NewBatchRow(
     Code = "LO01",
     Name = "Lô Một",
     ImportDate = DateTime.Today,
-    ProductionDate = productionDate ?? DateTime.Today,
+    ProductionDate = productionDate ?? (includeOptionalValues ? DateTime.Today : null),
+    ProductionDateRawValue = productionDateRawValue,
     ExpireDate = DateTime.Today.AddDays(1),
     WarehouseCode = includeOptionalValues ? "KHO01" : null,
     SubSupplierCode = includeOptionalValues ? "NCC01" : null,
@@ -274,7 +331,7 @@ file sealed class FakeBatchApiService(bool noProcessSteps) : IBatchApiService
             Employees = [new EmployeeOption { Id = 31, Code = "NV01", Name = "Nhân viên Một" }],
             Facilities = [new FacilityOption
             {
-                Id = 47, Code = "CS01", Name = "Cơ sở Một", Address = "Hà Nội"
+                Id = 47, Code = "KHO_TD", Name = "Cơ sở Một", Address = "Hà Nội"
             }]
         }));
 

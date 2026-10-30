@@ -97,6 +97,7 @@ public sealed class ExcelImportService
 
                 var employeeValue = Text(row, headers, "employee_name");
                 var imageSource = Text(row, headers, "image_source");
+                var productionDateRawValue = Text(row, headers, "production_date");
                 rows.Add(new ImportBatchRow
                 {
                     SourceFileName = Path.GetFileName(filePath),
@@ -108,6 +109,7 @@ public sealed class ExcelImportService
                     Name = batchName,
                     ImportDate = Date(row, headers, "import_date"),
                     ProductionDate = Date(row, headers, "production_date"),
+                    ProductionDateRawValue = productionDateRawValue,
                     ExpireDate = Date(row, headers, "expire_date"),
                     WarehouseCode = Text(row, headers, "warehouse_code"),
                     WarehouseName = Text(row, headers, "warehouse_name"),

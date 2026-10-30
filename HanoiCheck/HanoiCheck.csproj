@@ -18,4 +18,8 @@
   <ItemGroup>
     <Resource Include="Assets\HanoiCheck.ico" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

@@ -15,16 +15,16 @@ public sealed class BatchPayloadBuilder
             throw new InvalidOperationException("Chỉ có thể build payload cho dòng hợp lệ.");
         }
 
-        if (row.Images.Count > 3)
+        if (row.Images.Count > 10)
         {
             throw new InvalidOperationException(
-                "Cột Ảnh và giấy tờ minh chứng của lô chỉ được đính kèm tối đa 3 file.");
+                "Cột Ảnh và giấy tờ minh chứng của lô chỉ được đính kèm tối đa 10 file.");
         }
 
-        if (row.BatchSteps.Any(step => step.Images.Count > 3))
+        if (row.BatchSteps.Any(step => step.Images.Count > 10))
         {
             throw new InvalidOperationException(
-                "Cột File chứng minh chỉ được đính kèm tối đa 3 file.");
+                "Cột File chứng minh chỉ được đính kèm tối đa 10 file.");
         }
 
         var content = new MultipartFormDataContent();

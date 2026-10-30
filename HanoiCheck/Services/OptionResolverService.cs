@@ -173,11 +173,13 @@ public sealed class OptionResolverService(
             row.Errors.Add("Ngày nhập trống hoặc không đúng định dạng.");
         }
 
-        if (row.Source.ProductionDate is null)
+        if (!string.IsNullOrWhiteSpace(row.Source.ProductionDateRawValue) &&
+            row.Source.ProductionDate is null)
         {
-            row.Errors.Add("Ngày sản xuất trống hoặc không đúng định dạng.");
+            row.Errors.Add("Ngày sản xuất không đúng định dạng.");
         }
-        else if (row.Source.ProductionDate.Value.Date > DateTime.Today)
+        else if (row.Source.ProductionDate is not null &&
+                 row.Source.ProductionDate.Value.Date > DateTime.Today)
         {
             row.Errors.Add("Ngày sản xuất không được lớn hơn ngày hiện tại.");
         }
@@ -235,6 +237,16 @@ public sealed class OptionResolverService(
     {
         if (row.BatchSteps.Count == 0)
         {
+            if (!string.IsNullOrWhiteSpace(row.Source.Facility))
+            {
+                row.Errors.Add("Không có bước quy trình để gắn Cơ sở thực hiện.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(row.Source.ExecutionAddress))
+            {
+                row.Errors.Add("Không có bước quy trình để gắn Địa chỉ thực hiện.");
+            }
+
             if (!string.IsNullOrWhiteSpace(row.Source.ProofFileSource))
             {
                 row.Errors.Add("Không có bước quy trình để gắn File chứng minh.");
