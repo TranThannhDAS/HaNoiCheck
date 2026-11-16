@@ -20,6 +20,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Update="appsettings.json"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <PublishFile Include="appsettings.json">
+      <Visible>False</Visible>
+      <Group />
+      <TargetPath>appsettings.json</TargetPath>
+      <PublishState>Include</PublishState>
+      <IncludeHash>True</IncludeHash>
+      <FileType>File</FileType>
+    </PublishFile>
   </ItemGroup>
 </Project>
