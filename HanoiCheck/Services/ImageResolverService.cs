@@ -8,7 +8,7 @@ public sealed class ImageResolverService
     private const int MaximumFilesPerField = 10;
     private const long MaximumFileSize = 5 * 1024 * 1024;
     private static readonly HashSet<string> SupportedExtensions =
-        new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".webp", ".png", ".pdf" };
+        new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".webp", ".pdf" };
 
     public ServiceResult<IReadOnlyList<ResolvedImage>> ResolveFromExcel(
         string? source,
